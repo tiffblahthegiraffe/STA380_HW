@@ -594,7 +594,7 @@ The plot shows that our six groups are separated in a fairly clear fashion.
 
 Now, let us move on to PCA to further analyze our hypothetical groups.
 
-```{r,warning=FLASE,message=FALSE}
+```{r,warning=FALSE,message=FALSE}
 #Run PCA with 5 ranks
 pc1 = prcomp(social_norm, scale=TRUE, rank=5)
 loadings = pc1$rotation
