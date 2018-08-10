@@ -431,3 +431,263 @@ for (i in 1:10){
     print(VaR)
 }
 ```
+
+
+#Problem 4 Market segmentation
+
+```{r,results='hide', message=FALSE, warning=FALSE}
+library(tidyverse)  # data manipulation
+library(cluster)    # clustering algorithms
+library(factoextra) # clustering algorithms & visualization
+library(corrplot)
+
+```
+
+####Data Exploration
+```{r}
+# read file
+social <- read.csv(url("https://raw.githubusercontent.com/jgscott/STA380/master/data/social_marketing.csv"), row.names = 1)
+#drop columns spam, adult, and uncategorized from file
+social = subset(social, select = -c(spam,adult,uncategorized))
+```
+
+```{r}
+corrplot(cor(social), type = "lower")
+```
+
+
+From the correlation plot, we can identidy several variables with high correlation.<br>
+For example: personal_fitness and health_nutrition.<br>
+
+
+```{r}
+knitr::include_graphics("https://raw.githubusercontent.com/tiffblahthegiraffe/STA380_HW/master/plot.png")
+```
+
+With excel, we looked further into the correlations between variables, and decided to manually group several highly correlated variables together into six hypothetical groups/clusters, as displayed below:
+```{r}
+knitr::include_graphics("https://raw.githubusercontent.com/tiffblahthegiraffe/STA380_HW/master/group.png")
+
+```
+
+
+Let's dig into each group a little more:<br>
+Group 1 is influencer, whom can be seem as the social media savvy millennials that like sharing their lifestyle online<br>
+Group 2 represents businessman, a group of corporate people that enjoy politics, news, and business
+Group 3 are artists that talks about art, music and films on social media<br>
+Group 4 captures familyguy. These people are very family oriented, with interests including religion, family, and parenting<br>
+Group 5 is "dude." Think about a college male that likes online gaming and sports.<br>
+Group 6 represents "fit." These people care about their fitness, shape, nutrition consumption, and hope to stay active<br>
+
+
+Now, with six hypothetical groups, we want to use clustering to see if our correlation-based groups serve as a group proxy as NutrientH20's market segmentation
+
+####K Means
+
+```{r}
+#create hypothetical groups in dataframe
+social["influencer"] = social$chatter+social$photo_sharing+social$shopping+social$current_events+social$dating + social$cooking+social$beauty+social$fashion
+social["businessman"] = social$travel + social$politics +social$computers +social$news + social$automotive +social$business
+social['artists'] = social$tv_film +social$art +social$music +social$crafts +social$small_business
+social['familyguy'] = social$sports_fandom + social$religion +social$parenting +social$school +social$food +social$family +social$home_and_garden
+social['dude'] = social$online_gaming +social$college_uni +social$sports_playing
+social['fit'] =social$outdoors+social$health_nutrition+social$personal_fitness+social$eco
+```
+
+```{r}
+#select six groups and form new dataframe
+social_new = social[, c(34:39)]
+
+#normalize social_new for better comparison between rows
+social_norm = social_new/rowSums(social_new)
+
+#scale social_norm
+social_scaled <- scale(social_norm, center=TRUE, scale=TRUE)
+```
+
+```{r}
+#select K
+set.seed(123)
+fviz_nbclust(social_scaled, kmeans, method = "wss")
+```
+
+From elbow method, it is concluded that k=6 gives us best clustering result
+
+```{r,message=FALSE,warning=FALSE}
+set.seed(123)
+fviz_nbclust(social_scaled, kmeans, method = "silhouette")
+
+```
+
+
+Again, K=6 returns best clusting result.
+
+To triple check, we calculate CH<br>
+
+```{r,message=FALSE,warning=FALSE}
+set.seed(123)
+for (i in 2:10){
+  final <- kmeans(social_scaled, centers = i , nstart = 25)
+  B = final$betweenss
+  final$withinss
+  W = final$tot.withinss
+  B/W
+  n = nrow(social_scaled)
+  k=i
+  CH = (B/(k-1))/(W/(n-k))
+  cat("k=", k, ", CH:", CH, "\n")
+  
+}
+```
+
+
+When K=6, CH reches its max of 3358.518<br>
+From the methods above, we get a preliminary idea that our six manually selected groups might be a good proxy for market segmentation
+
+```{r}
+set.seed(123)
+#use K=6 to run kmeans
+final <- kmeans(social_scaled, centers =6 , nstart = 25)
+```
+```{r}
+set.seed(123)
+#display centers of seven clusters to see how they are allocated
+print(final$centers)
+```
+
+
+From the result, we can see that our hypothetical grouping method works well!<br>
+Each of the six groups represents a distinct demographics.<br>
+
+
+Cluster 1 represents "artists." Variables include: tv_film, art, music, crafts, small_business<br>
+
+Cluster 2 is "fit." These people are the outdoor enthuiast that care about health_nutrition, outdoors, personal_fitness, and eco.<br>
+
+Cluster 3 centers on "dude," a proxy for people who enjoy topics like online_gaming, college_uni, sports_playing.<br>
+
+Cluster 4 centers on "familyguy." This category captures people who are "family oriented" and enojoy taking about topics like sports_fandom, religion, parenting, school, food, family, and home_and_garden.<br>
+
+Cluster 5 centers heavily on the businessman group, which includes people who like talking about topics like travel, travel, politics, computers, news, automotive, business.<br>
+
+Cluster 6 captures "influencers," which can be thought as the millennials that like sharing lifestyle related topics on social media. Topics include:photo_sharing, shopping, current_events, dating, cooking, beauty, fashion.<br>
+
+```{r}
+#lets see how many people belong in each group with this line of code:
+final$size
+```
+
+cluster 1 (artists) has 841 people<br>
+cluster 2 (fit) has 1362 people<br>
+cluster 3 (dude) represents 627 people<br>
+cluster 4 (familyguy) includes 1133 people<br>
+cluster 5 (businessman) has 1205 people<br>
+cluster 6 (influencer) includes 2714 people<br>
+```{r}
+#kmeans plot to show 6 clusters 
+fviz_cluster(final, data = social_scaled, ellipse.type = "norm", stand = TRUE, geom = "point")
+```
+
+The plot shows that our six groups are separated in a fairly clear fashion. 
+
+####PCA
+
+Now, let us move on to PCA to further analyze our hypothetical groups.
+
+```{r,warning=FLASE,message=FALSE}
+#Run PCA with 5 ranks
+pc1 = prcomp(social_norm, scale=TRUE, rank=5)
+loadings = pc1$rotation
+scores = pc1$x
+```
+
+```{r}
+#several biplots show the first two PCs and how these groups are segmented
+
+q1 = qplot(scores[,1], scores[,2], color= social_norm$influencer , xlab='Component 1', ylab='Component 2')
+q2 = qplot(scores[,1], scores[,2], color = social_norm$businessman, xlab='Component 1', ylab='Component 2')
+q3 = qplot(scores[,1], scores[,2], color = social_norm$artists, xlab='Component 1', ylab='Component 2')
+q4 = qplot(scores[,1], scores[,2], color = social_norm$familyguy, xlab='Component 1', ylab='Component 2')
+q5 = qplot(scores[,1], scores[,2], color = social_norm$dude, xlab='Component 1', ylab='Component 2')
+q6 = qplot(scores[,1], scores[,2], color = social_norm$fit, xlab='Component 1', ylab='Component 2')
+```
+
+
+These plots showcase where each hypothetical group belong in the PCA two-domention result. A plot represent a twitter user, and the more red it is, the the more percentage of the user's posts relate to the corresponding group.<br>
+In other words, the more red it is, the more the user belongs to a hypothetical group we created.<br>
+
+**The influencer**
+```{r}
+#influencer
+q1+scale_color_gradient(low="ivory", high="red")
+```
+
+This plot shows where influencer sits in this dimension.
+
+**The businessman**
+```{r}
+#Businessman
+q2+scale_color_gradient(low="ivory", high="red")
+```
+
+This plot shows  businessman (red) versus others (white).
+
+**The artist**
+```{r}
+#Artists
+q3+scale_color_gradient(low="ivory", high="red")
+```
+
+This plot points out those where are artists are. 
+
+**The familyguy**
+```{r}
+#Familyguy
+q4+scale_color_gradient(low="ivory", high="red")
+```
+
+This plot identifies the familyguy group.
+
+**The dude**
+```{r}
+#Dude
+q5+scale_color_gradient(low="ivory", high="red")
+```
+
+This plot shows where "dude" sit related to others
+
+**The fit**
+```{r}
+#Fit
+q6+scale_color_gradient(low="ivory", high="red")
+```
+
+This plot clearly identifies the "fit" group
+
+
+**Interpretation: 
+component1 does a great job separating influencer (right) from familyguy and businessman (left of graph)
+Component 2 is great at separating "fit" (upper) from  "artists" and "dude" (lower)
+
+```{r}
+o1 = order(loadings[,1], decreasing=TRUE)
+colnames(social_norm)[head(o1,2)]
+
+```
+
+from the formula below, it is clear that PC1, 2 has the ability to separate influencer and fit out from the rest of the data; result aligns with plots
+
+```{r}
+loadings
+```
+Looking at the vectors, we attain the same results.
+
+
+####Conclusion 
+
+From kmeans clustering and PCA, we can conclude that our hypothecial grouping method works very well in identifying users with different interests on social media, or "socialgraphics." This output can help NutrientH20 better target its audience and focus their social media marketing efforts on a more defined and targeted group of people. 
+
+Once again, the groups, variables included, and number of peolpe in each group:
+```{r}
+knitr::include_graphics("https://raw.githubusercontent.com/tiffblahthegiraffe/STA380_HW/master/final.png")
+```
