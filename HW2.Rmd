@@ -1,0 +1,498 @@
+---
+title: "STA 380 Homework 2"
+author: "Henry Chang, Joseph Chin, Tiffany Sung, Jeffrey Fulkerson"
+date: "August 17, 2018"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, warning=FALSE, message=FALSE)
+```
+#Problem 1: Flighs at ABIA
+```{r, tidy = TRUE}
+library(RColorBrewer)
+library(gplots)
+#setup 
+
+# Read in Data
+data_raw <- read.csv("ABIA.csv")
+# Clean
+# --Year is the same for every row
+# --Only interested in flights originating from Austin, TX
+drops <- c("Year") 
+data <- data_raw[ data_raw$Origin == "AUS", !(names(data_raw) %in% drops)] 
+rm(data_raw)
+
+```
+For the purpose of this project, We decide to narrow our analysis to flights departing from AUS only.
+
+
+###EDA
+**How do we minimize delay?**
+
+We believe that a delay longer than 45 minutes is significant to a business traveler; thus, we decide to analyze flights meeting this standard in Austin-Bergstrom International Airport in 2008.
+```{r, tidy=TRUE}
+# Plotting functions
+plot_delays <- function(dcol, col, colName){
+  ## This function plots delay variables
+  # --Model
+  threshold = 45
+  delays <- data[eval(dcol) > threshold,]
+  # --Clean Delays data of high outliers and NA
+  delays <- delays[eval(col) < unname(quantile(eval(col), 0.99, na.rm = TRUE)),]
+  delays <- delays[! is.na(eval(col)),]
+  # --Display Results
+  print(round(table(delays$DayOfWeek) / dim(delays)[1] * 100.0, 2))
+  print(summary(eval(col)))
+  par(mfrow=c(2,2))
+  barplot(table(delays$DayOfWeek), xlab="Days of the Week (M-Su)", ylab="Count")
+  hist(eval(col), xlab = colName)
+  boxplot(eval(col) ~ delays$DayOfWeek, xlab = "Day of the Week (M-Su)" , ylab = colName)
+  plot(delays$DepTime, eval(col), xlab = "Departure Time" , ylab = colName)
+}
+
+```
+
+```{r, echo=FALSE}
+# RUN THIS VV BLOCK TO PLOT FUNCTIONS
+# Choose Variable: 
+dcol <- quote(data$DepDelay) # <---- Choose Delay Variable to plot.
+col <- quote(delays$DepDelay) # <--- Choose THE SAME Delay Variable to plot.
+colName <- "Departure Delay (min)" # Choose what you want to call the variable
+
+plot_delays(dcol,col,colName)
+```
+<br>
+Given the preliminary exploratory data analysis, we found out that Friday on average has the worst delay statistics, with most flights having longer than 45 minute delays. Separately, the graph on the bottom right showcases that departure time also affects the departure delay time of a flight. 
+
+###Delay Heatmap 
+
+Given the summary above, we would like to create several delay heatmaps to help business travelers flying out of Austin minimize delay time by choosing the optimal time, day, and Airline combination.
+
+We create heatmaps for the top 5 airlines with the most number of flights in AUS:
+
+1. Southwest Airlines (WN)
+2. American Airlines (AA)
+3. Continental Airlines (CO)
+4. Mesa Airlines (YV)
+5. JetBlue Airways (B6)
+
+These heatmaps will show the possibility of a flight having a delay of more than 45 minutes, given the flight's departure time and day of week. The darker the color, the higher possibility of delay.
+
+```{r}
+# CREATE A HEATMAP
+# Create a Day of Week by Departure Time matrix of Average Delays (in minutes)
+# for a particular airline
+airlines <- c("WN", "AA", "CO", "YV", "B6")
+carrierCodeLookup <- c("Southwest Airlines", 
+                       "American Airlines",
+                       "Continental (UA)",
+                       "Mesa Airlines",
+                       "JetBlue")
+
+airlineHeatMap <- function(cc, airlineName, timeIntervalInMinutes, thresholdInMinutes){
+
+  # Setup
+  timeInterval_converted <- timeIntervalInMinutes*(5.0/3.0) # Convertion from base 60 (time) to base 100 (0-2400)
+  threshold <- thresholdInMinutes*(5.0/3.0) # How many minutes late are we counting, converted to base 100
+  numRows <- 2400/(timeInterval_converted) 
+  values <- c()
+  
+  # Get Dataframe of just Carrier Code cc
+  cc_data <- data[data$UniqueCarrier == cc, c("DayOfWeek", "DepTime", "DepDelay")] # TODO Limit this to just the necessary list of columns
+  
+  interval <- seq(from=0, to=2400, by=timeInterval_converted)
+  l_interval <- length(interval)
+  
+  # For each day of the week...
+  for (day in c(1,2,3,4,5,6,7)){
+    cc_data_day <- cc_data[cc_data$DayOfWeek == day,]
+    
+    # For each time period...
+    for (t in c(2:l_interval-1)){
+      cc_data_day_t <- cc_data_day[interval[t] < cc_data_day$DepTime & cc_data_day$DepTime < interval[t+1],]
+      
+      # Get the Percent Chance of Delays * Avg. Duration of Delays in minutes
+      totalFlights_t <- dim(cc_data_day_t)[1] 
+      delays <- cc_data_day_t[cc_data_day_t$DepDelay >= threshold,"DepDelay"]
+      numDelays_t <- length(delays[!is.na(delays)]) 
+      sumDelays_t <- sum(delays, na.rm=TRUE) 
+      
+      #delayIntensity <- (numDelays_t/totalFlights_t)*(sumDelays_t/numDelays_t)
+      delayIntensity <- numDelays_t/totalFlights_t
+      if (is.na(delayIntensity)){delayIntensity = 0}
+      values <- c(values, delayIntensity) # TESTING: paste(day, totalFlights_t, sep=':')
+    }
+  }
+  
+  # Create Matrix with Values inside
+  return <- matrix(data=values, nrow=numRows, ncol=7)
+}
+
+```
+
+```{r, results = 'hide',echo=FALSE}
+#create datafrmae that with 
+WN_m <- airlineHeatMap(airlines[1],
+                       carrierCodeLookup[1],
+                       60,
+                       45)
+AA_m <- airlineHeatMap(airlines[2],
+                       carrierCodeLookup[2],
+                       60,
+                       45)
+CO_m <- airlineHeatMap(airlines[3],
+                       carrierCodeLookup[3],
+                       60,
+                       45)
+YV_m <- airlineHeatMap(airlines[4],
+                       carrierCodeLookup[4],
+                       60,
+                       45)
+B6_m <- airlineHeatMap(airlines[5],
+                       carrierCodeLookup[5],
+                       60,
+                       45)
+```
+
+```{r, results='hide', echo=FALSE}
+#setup for cleaner heatmap
+day=c( "MON", "TUE" ,"WED", "THU", "FRI", "SAT", "SUN")
+a= c()
+for (i in c(0:23)){
+  
+  if (i < 10){
+    a = c(a, paste("0",i,":00" ,sep="" ))
+  }
+  
+  else{
+    a = c(a, paste(i,":00" ,sep="" ))
+  }
+  
+}
+
+b= c()
+for (i in c(1:23, 00)){
+  if (i < 10){
+    b = c(b, paste("0",i,":00" ,sep="" ))
+  }
+  else{
+    b = c(b, paste(i,":00" ,sep="" ))
+  }
+}
+
+
+hour = c()
+for (i in c(1:24)){
+  hour = c(hour, paste(a[i],b[i],sep="-" ))
+}
+```
+
+####Heatmaps
+```{r}
+#plot a heatmap for Southwest Airlines
+
+heatmap(WN_m, Rowv=NA, Colv=NA,col= colorRampPalette(brewer.pal(9, "Blues"))(100),xlab="Day of Week", ylab="Departure Time", main="Southwest Airlines", scale = 'none', labCol = day, labRow = hour, margins = c(4,7), cexRow=0.9,cexCol = 1)
+
+```
+<br>
+If you want to minimize delay, avoid Thursday, Friday, Sunday 22:00-23:00 flights from Southwest.
+
+```{r}
+#plot a heatmap for American Airlines
+
+heatmap(AA_m, Rowv=NA, Colv=NA,col= colorRampPalette(brewer.pal(9, "Blues"))(100),xlab="Day of Week", ylab="Departure Time", main="American Airlines", scale = 'none', labCol = day, labRow = hour, margins = c(4,7), cexRow=0.9,cexCol = 1)
+```
+<br>
+If you want to minimize delay, avoid Sunday and Monday 20:00 - 22:00 flights from American Airlines.
+
+```{r}
+#plot a heatmap for Continental Airlines
+
+heatmap(CO_m, Rowv=NA, Colv=NA,col= colorRampPalette(brewer.pal(9, "Blues"))(100),xlab="Day of Week", ylab="Departure Time", main="Continental Airlines", scale = 'none', labCol = day, labRow = hour, margins = c(4,7), cexRow=0.9,cexCol = 1)
+```
+<br>
+Try avoiding flights departing around 13:00-14:00 on Weekdays, as well as Monday, Wednesday, Sunday late night flights with Continental.
+
+```{r}
+#plot a heatmap for Mesa Airlines
+
+heatmap(YV_m, Rowv=NA, Colv=NA,col= colorRampPalette(brewer.pal(9, "Blues"))(100),xlab="Day of Week", ylab="Departure Time", main="Mesa Airlines", scale = 'none', labCol = day, labRow = hour, margins = c(4,7), cexRow=0.9,cexCol = 1)
+```
+<br>
+Mesa has several interesting delay blocks. In general, stay away from Mesa if you want to travel on a Tuesday night.
+```{r}
+#plot a heatmap for Jetblue Airlines
+
+heatmap(B6_m, Rowv=NA, Colv=NA,col= colorRampPalette(brewer.pal(9, "Blues"))(100),xlab="Day of Week", ylab="Departure Time", main="JetBlue Airways", scale = 'none', labCol = day, labRow = hour, margins = c(4,7), cexRow=0.9,cexCol = 1)
+```
+<br>
+If you want to minimize the possibility of delay, avoid Tuesday, Saturday, and Sunday 19:00-22:00 flights from Jetblue.
+
+###Conclusion 
+With these heatmaps, travelers will be able to minimize delay time by choosing the best day-time combination with one of the top five airlines.
+
+***
+#Problem 2: Author attribution
+
+###Setup
+
+By function "text_data_preprocess" we get a cleaned Corpus containing all of 2500 the document wiritten by each author. And the "get_y" function gives us a length 2500 list of authors whose order is the same as our Corpus object.
+```{r}
+library(tm) 
+library(magrittr)
+library(slam)
+library(proxy)
+library(glmnet)
+library(caret)
+library(dplyr)
+library(naivebayes)
+library(randomForest)
+library(e1071)
+library(caret)
+
+text_data_preprocess = function(pp){
+  writer_list = list.files(pp)
+  
+  read_f_list = c()
+  
+  
+   readerPlain = function(fname){
+    readPlain(elem=list(content=readLines(fname)), 
+              id=fname, language='en') }
+  
+  for ( i in writer_list){
+    read_f_list = c(read_f_list,
+                    Sys.glob(paste0(pp,i,'/*.txt')))
+  }
+  
+  all_Doc = lapply(read_f_list, readerPlain) 
+  
+  mynames = read_f_list %>%
+  { strsplit(., '/', fixed=TRUE) } %>%
+  { lapply(., tail, n=2) } %>%
+  { lapply(., paste0, collapse = '') } %>%
+    unlist
+  
+  
+  names(all_Doc) = mynames
+  
+  
+  
+  documents_raw = Corpus(VectorSource(all_Doc))
+  
+  
+  my_documents = documents_raw
+  my_documents = tm_map(my_documents, content_transformer(tolower)) # make everything lowercase
+  my_documents = tm_map(my_documents, content_transformer(removeNumbers)) # remove numbers
+  my_documents = tm_map(my_documents, content_transformer(removePunctuation)) # remove punctuation
+  my_documents = tm_map(my_documents, content_transformer(stripWhitespace)) ## remove excess white-space
+  my_documents = tm_map(my_documents, content_transformer(removeWords), stopwords("en"))
+  return(my_documents)
+}
+
+get_y = function(pp){
+  writer_list = list.files(pp)
+  y = c()
+  for ( i in writer_list){
+    y = c(y, rep(i, 
+                 times = length(list.files(paste0(pp,i)))))
+  }
+  return(y)
+}
+```
+
+We build our "document term matrix" and prepare for PCA by removing sparse terms, sort columns by alphabetical order, and remove the zero-sum columns.
+```{r}
+my_documents = text_data_preprocess('C:/Users/Joseph/Desktop/jgscott git/data/ReutersC50/C50train/')
+y = get_y('C:/Users/Joseph/Desktop/jgscott git/data/ReutersC50/C50train/')
+DTM_all = DocumentTermMatrix(my_documents)
+DTM_all_d = removeSparseTerms(DTM_all, 0.95)
+DTM_all_s = DTM_all_d[ ,order(DTM_all_d$dimnames$Terms)]
+
+tfidf_all = weightTfIdf(DTM_all_d)
+tfidf_matrix = as.matrix(tfidf_all)
+
+scrub_cols = which(colSums(tfidf_matrix) == 0)
+pre_pca_1 = tfidf_matrix[,-scrub_cols]
+```
+
+We then read the test data, ordered it, and take the intersection of words used in both test data and training data.
+```{r}
+test_documents = text_data_preprocess('C:/Users/Joseph/Desktop/jgscott git/data/ReutersC50/C50test/')
+y_test = get_y('C:/Users/Joseph/Desktop/jgscott git/data/ReutersC50/C50test/')
+DTM_test = DocumentTermMatrix(test_documents)
+DTM_test_s = DTM_test[, order(DTM_test$dimnames$Terms)]
+Term_inter = intersect(Terms(DTM_test_s), colnames(pre_pca_1))
+```
+
+
+We then run PCA using our training document term matrix, using the vocabulary intersection as columns. And we tried to fit a logistic regression using first 100 prinicle component.
+```{r}
+pre_pca_2 = pre_pca_1[,Term_inter]
+pc_doc = prcomp(pre_pca_2, scale = TRUE)
+X = (pc_doc$x)[, 1:100]
+logit_model = cv.glmnet(X,as.factor(y),family='multinomial',type.measure="class")
+```
+
+The last step is to predict y_test_hat using the lasso regression with the lambda having minimum error. We found that the accuracy of PCA + logistic regression is 55%
+```{r}
+DTM_test_c = DTM_test_s[,Term_inter]
+tfidf_test = weightTfIdf(DTM_test_c)
+tfidf_test_matrix = as.matrix(tfidf_test)
+tfidf_test_matrix_s = scale(tfidf_test_matrix)
+pc_test = (tfidf_test_matrix_s %*% pc_doc$rotation)[, 1:100]
+
+y_test_hat = predict(logit_model,   pc_test,
+                     type = "class", s = logit_model$lambda.min)
+pred2   = ifelse( y_test_hat == y_test,  1, 0)
+mean(pred2)
+```
+
+DarrenSchuettler,DavidLawder,EdnaFernandes,BenjaminKangLim,JaneMacartney,WilliamKazer are the authors that PCA + logistic regression can't predict well.
+```{r}
+author_p_result_df = data.frame(y_test, pred2)
+author_p_result= author_p_result_df %>% 
+    group_by(y_test) %>%
+    summarise(p_accu = mean(X1))
+author_p_result_s = author_p_result[order(author_p_result$p_accu),]
+```
+
+###Naive Bayes
+***Train/Test Set*
+```{r,collapse=TRUE}
+mycorpus = text_data_preprocess('C:/Users/Joseph/Desktop/jgscott git/data/ReutersC50/C50train/')
+labels = get_y('C:/Users/Joseph/Desktop/jgscott git/data/ReutersC50/C50train/')
+DTM = DocumentTermMatrix(mycorpus)
+DTM = removeSparseTerms(DTM, 0.975)
+tfidf_train = weightTfIdf(DTM)
+
+X = as.matrix(tfidf_train)
+
+mycorpus2 = text_data_preprocess('C:/Users/Joseph/Desktop/jgscott git/data/ReutersC50/C50test/')
+labels2 = get_y('C:/Users/Joseph/Desktop/jgscott git/data/ReutersC50/C50test/')
+
+DTM2=DocumentTermMatrix(mycorpus2)
+DTM2=removeSparseTerms(DTM2,0.975)
+tfidf_test = weightTfIdf(DTM2)
+
+x2=as.matrix(tfidf_test)
+
+
+words=colnames(X)
+words2=colnames(x2)
+
+W=words[!(words %in% words2)]
+W2=words2[!(words2 %in% words)]
+
+words_matrix=matrix(0,nrow=nrow(x2), ncol=length(W))
+colnames(words_matrix)=W
+
+words_matrix2=matrix(0,nrow=nrow(X), ncol=length(W2))
+colnames(words_matrix2)=W2
+
+train_matrix=cbind(X,words_matrix2)
+test_matrix=cbind(x2,words_matrix)
+```
+***Predict Test Accuracy*
+```{r}
+test_matrix=as.data.frame(test_matrix)
+train_matrix=as.data.frame(train_matrix)
+
+nb = naive_bayes(x=train_matrix,y=as.factor(labels),laplace=1) 
+predNB=predict(nb,test_matrix)
+
+actual = rep(1:50,each=50)
+
+TestTable = table(predNB,actual)
+correct = 0
+for (i in seq(1,50)){
+    correct = correct + TestTable[i,i]
+}
+
+NB_accuracy = correct/2500
+print(NB_accuracy)
+```
+
+The Naive Bayes model prediction accuracy is somewhat low, despite being much better than randomly guessing. A different model may have better predictive accuracy 0.4416<br>
+
+***Confusion Matrix of Naive Bayes*
+First, creat a confusion matrix to calculate the accuracy of the model in predicting the authors. Sensitivity column gives the accuracy % of predicting the documents under each of the authors correctly. Also, the accuracy of the model is the average of the accuracy measures for all the authors.
+```{r}
+NB_confusion = confusionMatrix(table(predNB,labels))
+NB_class= as.data.frame(NB_confusion$byClass)
+NB_class[order(-NB_class$Sensitivity),][1]
+```
+The model predict well for a few authors like LynnleyBrowning, MatthewBunce and RobinSidel.
+###Random Forests###
+***Predict Test Accuracy*
+```{r}
+RF = randomForest(y=as.factor(labels), x=train_matrix,ntrees=500)
+pr = predict(RF, test_matrix, type = "response")
+
+TestTable2 = table(pr, actual)
+
+correct2 = 0
+for (i in seq(1,50)){
+    correct2 = correct2 + TestTable2[i,i]
+}
+
+RF_accuracy = correct2/2500
+print(RF_accuracy)
+```
+
+The random forest model was a good bit better at  0.6188
+
+**Confusion Matrix of Random Forest**
+```{r, collapse=TRUE}
+RF_confusion = confusionMatrix(table(pr,labels))
+RF_class= as.data.frame(RF_confusion$byClass)
+RF_class[order(-RF_class$Sensitivity),][1]
+AccuracyRF = mean(RF_class$Sensitivity)
+```
+The model predict well for a few authors like FumikoFujisaki, JimGilchrist and LynnleyBrowning. And we can also see that random forest model, on average, have a better accuracy then the other model we did.
+
+#Q3 Association Rule Mining
+###Set up### 
+```{r,results='hide', message=FALSE, warning=FALSE}
+library(tidyverse)
+library(arules) 
+library(arulesViz)
+```
+
+We first read in our grocery list by letting each row of the data as a basket of one shopping list.<br>
+And we seperate each row by comma as items in each basket.
+```{r}
+groceries = read.transactions('C:/Users/Joseph/Desktop/jgscott git/data/groceries.txt', 
+                              format = 'basket', 
+                              sep = ',', 
+                              rm.duplicates = FALSE)
+grocery<- as(groceries, "transactions")
+```
+
+The apriori algorithm is used to identify the associations between the different products from the different baskets that were loaded. We first choose a stricter criteria of support value = 0.005 and a confidence = 0.5 and we could observe that the results are mostly 'whole milk' and 'other vegetables'.<br>
+
+Based on this result, we found that 'whole milk' and 'other vegetables' consists a significant portion of purchases from this grocery store. Therefore, we suggest that 'whole milk' and 'other vegatables' can be placed in the center of our store, which not only improves our costumor's shopping experience by getting what they needed quickly but also increases exposure of other products.<br>
+
+```{r}
+groc_rules <- apriori(grocery, parameter=list(support=.005, confidence=.5, maxlen=6))
+inspect(groc_rules)
+```
+
+
+###Set threshold for lift and confidence###
+In order to find other interesting associations on products that are puchased less, we loosen our filtering criteria to support = 0.002 and confidence = 0.4 and we sorted the association rules found by lift.<br>
+
+As we expected, items purchased less frequently are shown after adjusting our support filter. In addition, association rules found among them tend to have higher lift for their lower support.<br>
+```{r}
+groc_rules_1 <- apriori(grocery, parameter=list(support=.002, confidence=.4, maxlen=6))
+inspect(sort(subset(groc_rules_1, count >= 10, rhs), by = "lift")[c(1:50)])
+```
+Intuitively, we could also tell that items under same category are frequently bought together, for example, hard cheese => whipped/sour cream, grapes,pip fruit => citrus fruits, and liquor => bottled beer. Furthermore, we also found interesting associations among different categories, for instance, people bought beef are more likely to buy root vegetables.<br>
+
+If we let support = 0.01 and confidence = 0.1 and observe the condition when lift > 3, we could see a clearer pattern of beef being bought along with root vegetables. This finding might help the marketing strategy of root vegetables since seller might not think of the fact that root vegetables are actually purchase a lot for side dishes when people want to have a steak or make beef stew.<br>
+```{r}
+groc_rules_2 <- apriori(grocery, parameter=list(support=.01, confidence=.1, maxlen=6))
+inspect(subset(groc_rules_2, subset = lift > 3))
+```
+
