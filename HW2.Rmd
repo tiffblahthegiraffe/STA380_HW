@@ -15,7 +15,7 @@ library(gplots)
 #setup 
 
 # Read in Data
-data_raw <- read.csv("ABIA.csv")
+data_raw <- read.csv(url("https://raw.githubusercontent.com/jgscott/STA380/master/data/ABIA.csv"))
 # Clean
 # --Year is the same for every row
 # --Only interested in flights originating from Austin, TX
@@ -28,7 +28,7 @@ For the purpose of this project, We decide to narrow our analysis to flights dep
 
 
 ###EDA
-**How do we minimize delay?**
+**In the EDA process we are interested in how we can minimize delay.**
 
 We believe that a delay longer than 45 minutes is significant to a business traveler; thus, we decide to analyze flights meeting this standard in Austin-Bergstrom International Airport in 2008.
 ```{r, tidy=TRUE}
@@ -76,8 +76,6 @@ We create heatmaps for the top 5 airlines with the most number of flights in AUS
 3. Continental Airlines (CO)
 4. Mesa Airlines (YV)
 5. JetBlue Airways (B6)
-
-These heatmaps will show the possibility of a flight having a delay of more than 45 minutes, given the flight's departure time and day of week. The darker the color, the higher possibility of delay.
 
 ```{r}
 # CREATE A HEATMAP
@@ -189,6 +187,7 @@ for (i in c(1:24)){
 ```
 
 ####Heatmaps
+These heatmaps will show the possibility of a flight having a delay of more than 45 minutes, given the flight's departure time and day of week. The darker the color, the higher probability of delay.
 ```{r}
 #plot a heatmap for Southwest Airlines
 
@@ -356,6 +355,7 @@ author_p_result= author_p_result_df %>%
     group_by(y_test) %>%
     summarise(p_accu = mean(X1))
 author_p_result_s = author_p_result[order(author_p_result$p_accu),]
+author_p_result_s[c(1:10),]
 ```
 
 ###Naive Bayes
@@ -396,6 +396,7 @@ test_matrix=cbind(x2,words_matrix)
 ```
 ***Predict Test Accuracy*
 ```{r}
+set.seed(1)
 test_matrix=as.data.frame(test_matrix)
 train_matrix=as.data.frame(train_matrix)
 
@@ -427,6 +428,7 @@ The model predict well for a few authors like LynnleyBrowning, MatthewBunce and 
 ###Random Forests###
 ***Predict Test Accuracy*
 ```{r}
+set.seed(1)
 RF = randomForest(y=as.factor(labels), x=train_matrix,ntrees=500)
 pr = predict(RF, test_matrix, type = "response")
 
@@ -441,7 +443,7 @@ RF_accuracy = correct2/2500
 print(RF_accuracy)
 ```
 
-The random forest model was a good bit better at  0.6188
+The random forest model was a good bit better at  0.6176<br>
 
 **Confusion Matrix of Random Forest**
 ```{r, collapse=TRUE}
@@ -452,7 +454,8 @@ AccuracyRF = mean(RF_class$Sensitivity)
 ```
 The model predict well for a few authors like FumikoFujisaki, JimGilchrist and LynnleyBrowning. And we can also see that random forest model, on average, have a better accuracy then the other model we did.
 
-#Q3 Association Rule Mining
+***
+#Problem 3: Association Rule Mining
 ###Set up### 
 ```{r,results='hide', message=FALSE, warning=FALSE}
 library(tidyverse)

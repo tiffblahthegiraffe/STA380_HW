@@ -136,7 +136,7 @@ library(gplots)
 #setup 
 
 # Read in Data
-data_raw &lt;- read.csv(&quot;ABIA.csv&quot;)
+data_raw &lt;- read.csv(url(&quot;https://raw.githubusercontent.com/jgscott/STA380/master/data/ABIA.csv&quot;))
 # Clean
 # --Year is the same for every row
 # --Only interested in flights originating from Austin, TX
@@ -146,7 +146,7 @@ rm(data_raw)</code></pre>
 <p>For the purpose of this project, We decide to narrow our analysis to flights departing from AUS only.</p>
 <div id="eda" class="section level3">
 <h3>EDA</h3>
-<p><strong>How do we minimize delay?</strong></p>
+<p><strong>In the EDA process we are interested in how we can minimize delay.</strong></p>
 <p>We believe that a delay longer than 45 minutes is significant to a business traveler; thus, we decide to analyze flights meeting this standard in Austin-Bergstrom International Airport in 2008.</p>
 <pre class="r"><code># Plotting functions
 plot_delays &lt;- function(dcol, col, colName){
@@ -184,7 +184,6 @@ plot_delays &lt;- function(dcol, col, colName){
 <li>Mesa Airlines (YV)</li>
 <li>JetBlue Airways (B6)</li>
 </ol>
-<p>These heatmaps will show the possibility of a flight having a delay of more than 45 minutes, given the flight’s departure time and day of week. The darker the color, the higher possibility of delay.</p>
 <pre class="r"><code># CREATE A HEATMAP
 # Create a Day of Week by Departure Time matrix of Average Delays (in minutes)
 # for a particular airline
@@ -235,6 +234,7 @@ airlineHeatMap &lt;- function(cc, airlineName, timeIntervalInMinutes, thresholdI
 }</code></pre>
 <div id="heatmaps" class="section level4">
 <h4>Heatmaps</h4>
+<p>These heatmaps will show the possibility of a flight having a delay of more than 45 minutes, given the flight’s departure time and day of week. The darker the color, the higher probability of delay.</p>
 <pre class="r"><code>#plot a heatmap for Southwest Airlines
 
 heatmap(WN_m, Rowv=NA, Colv=NA,col= colorRampPalette(brewer.pal(9, &quot;Blues&quot;))(100),xlab=&quot;Day of Week&quot;, ylab=&quot;Departure Time&quot;, main=&quot;Southwest Airlines&quot;, scale = 'none', labCol = day, labRow = hour, margins = c(4,7), cexRow=0.9,cexCol = 1)</code></pre>
@@ -363,13 +363,27 @@ y_test_hat = predict(logit_model,   pc_test,
                      type = &quot;class&quot;, s = logit_model$lambda.min)
 pred2   = ifelse( y_test_hat == y_test,  1, 0)
 mean(pred2)</code></pre>
-<pre><code>## [1] 0.5532</code></pre>
+<pre><code>## [1] 0.5516</code></pre>
 <p>DarrenSchuettler,DavidLawder,EdnaFernandes,BenjaminKangLim,JaneMacartney,WilliamKazer are the authors that PCA + logistic regression can’t predict well.</p>
 <pre class="r"><code>author_p_result_df = data.frame(y_test, pred2)
 author_p_result= author_p_result_df %&gt;% 
     group_by(y_test) %&gt;%
     summarise(p_accu = mean(X1))
-author_p_result_s = author_p_result[order(author_p_result$p_accu),]</code></pre>
+author_p_result_s = author_p_result[order(author_p_result$p_accu),]
+author_p_result_s[c(1:10),]</code></pre>
+<pre><code>## # A tibble: 10 x 2
+##    y_test           p_accu
+##    &lt;fct&gt;             &lt;dbl&gt;
+##  1 EdnaFernandes      0.16
+##  2 DarrenSchuettler   0.18
+##  3 DavidLawder        0.2 
+##  4 BenjaminKangLim    0.26
+##  5 JaneMacartney      0.28
+##  6 MureDickie         0.28
+##  7 WilliamKazer       0.3 
+##  8 HeatherScoffield   0.32
+##  9 MartinWolk         0.34
+## 10 JanLopatka         0.38</code></pre>
 </div>
 <div id="naive-bayes" class="section level3">
 <h3>Naive Bayes</h3>
@@ -407,7 +421,8 @@ colnames(words_matrix2)=W2
 train_matrix=cbind(X,words_matrix2)
 test_matrix=cbind(x2,words_matrix)</code></pre>
 <p>**<em>Predict Test Accuracy</em></p>
-<pre class="r"><code>test_matrix=as.data.frame(test_matrix)
+<pre class="r"><code>set.seed(1)
+test_matrix=as.data.frame(test_matrix)
 train_matrix=as.data.frame(train_matrix)
 
 nb = naive_bayes(x=train_matrix,y=as.factor(labels),laplace=1) 
@@ -481,7 +496,8 @@ NB_class[order(-NB_class$Sensitivity),][1]</code></pre>
 ## Class: BenjaminKangLim          0.14
 ## Class: DarrenSchuettler         0.14</code></pre>
 <p>The model predict well for a few authors like LynnleyBrowning, MatthewBunce and RobinSidel. ###Random Forests### **<em>Predict Test Accuracy</em></p>
-<pre class="r"><code>RF = randomForest(y=as.factor(labels), x=train_matrix,ntrees=500)
+<pre class="r"><code>set.seed(1)
+RF = randomForest(y=as.factor(labels), x=train_matrix,ntrees=500)
 pr = predict(RF, test_matrix, type = &quot;response&quot;)
 
 TestTable2 = table(pr, actual)
@@ -493,8 +509,8 @@ for (i in seq(1,50)){
 
 RF_accuracy = correct2/2500
 print(RF_accuracy)</code></pre>
-<pre><code>## [1] 0.6204</code></pre>
-<p>The random forest model was a good bit better at 0.6188</p>
+<pre><code>## [1] 0.6188</code></pre>
+<p>The random forest model was a good bit better at 0.6176<br></p>
 <p><strong>Confusion Matrix of Random Forest</strong></p>
 <pre class="r"><code>RF_confusion = confusionMatrix(table(pr,labels))
 RF_class= as.data.frame(RF_confusion$byClass)
@@ -504,54 +520,55 @@ RF_class[order(-RF_class$Sensitivity),][1]
 ## Class: JimGilchrist             0.98
 ## Class: LynnleyBrowning          0.98
 ## Class: GrahamEarnshaw           0.96
+## Class: AaronPressman            0.94
 ## Class: KarlPenhaul              0.92
-## Class: MatthewBunce             0.90
-## Class: RobinSidel               0.90
-## Class: AaronPressman            0.88
-## Class: MarcelMichelson          0.88
-## Class: PeterHumphrey            0.88
+## Class: MatthewBunce             0.92
+## Class: PeterHumphrey            0.90
 ## Class: JoWinterbottom           0.86
 ## Class: KouroshKarimkhany        0.86
-## Class: NickLouth                0.84
+## Class: NickLouth                0.86
+## Class: RobinSidel               0.86
 ## Class: SimonCowell              0.84
-## Class: LynneO'Donnell           0.78
+## Class: MarcelMichelson          0.82
+## Class: JohnMastrini             0.76
 ## Class: KeithWeir                0.76
-## Class: TimFarrand               0.76
-## Class: JohnMastrini             0.74
-## Class: MarkBendeich             0.74
-## Class: RogerFillion             0.74
-## Class: BradDorfman              0.72
-## Class: PatriciaCommins          0.68
-## Class: ToddNissen               0.66
-## Class: JonathanBirt             0.64
-## Class: MichaelConnor            0.64
+## Class: LynneO'Donnell           0.76
+## Class: MarkBendeich             0.76
+## Class: MichaelConnor            0.76
+## Class: RogerFillion             0.76
+## Class: PatriciaCommins          0.74
+## Class: TimFarrand               0.72
+## Class: ToddNissen               0.72
+## Class: BradDorfman              0.68
+## Class: JonathanBirt             0.68
+## Class: KevinDrawbaugh           0.64
 ## Class: SarahDavison             0.64
 ## Class: LydiaZajc                0.62
-## Class: TheresePoletti           0.60
 ## Class: KevinMorrison            0.58
-## Class: KevinDrawbaugh           0.56
-## Class: MureDickie               0.56
-## Class: BernardHickey            0.54
-## Class: AlanCrosby               0.52
-## Class: PierreTran               0.52
-## Class: SamuelPerry              0.50
-## Class: JanLopatka               0.46
-## Class: JoeOrtiz                 0.46
-## Class: AlexanderSmith           0.44
-## Class: JaneMacartney            0.44
+## Class: BernardHickey            0.52
+## Class: JanLopatka               0.52
+## Class: MureDickie               0.52
+## Class: PierreTran               0.50
+## Class: TheresePoletti           0.50
+## Class: JoeOrtiz                 0.42
+## Class: KirstinRidley            0.42
+## Class: AlanCrosby               0.40
+## Class: AlexanderSmith           0.40
 ## Class: HeatherScoffield         0.38
-## Class: MartinWolk               0.34
-## Class: BenjaminKangLim          0.32
-## Class: KirstinRidley            0.32
-## Class: WilliamKazer             0.32
+## Class: EricAuchard              0.36
+## Class: JaneMacartney            0.34
+## Class: SamuelPerry              0.34
+## Class: TanEeLyn                 0.32
 ## Class: DarrenSchuettler         0.30
-## Class: TanEeLyn                 0.30
-## Class: EricAuchard              0.28
+## Class: MartinWolk               0.30
+## Class: WilliamKazer             0.30
+## Class: BenjaminKangLim          0.28
 ## Class: EdnaFernandes            0.26
-## Class: ScottHillis              0.12
-## Class: DavidLawder              0.10
+## Class: DavidLawder              0.14
+## Class: ScottHillis              0.14
 AccuracyRF = mean(RF_class$Sensitivity)</code></pre>
 <p>The model predict well for a few authors like FumikoFujisaki, JimGilchrist and LynnleyBrowning. And we can also see that random forest model, on average, have a better accuracy then the other model we did.</p>
+<hr />
 </div>
 </div>
 <div id="q3-association-rule-mining" class="section level1">
@@ -585,9 +602,9 @@ grocery&lt;- as(groceries, &quot;transactions&quot;)</code></pre>
 ## Absolute minimum support count: 49 
 ## 
 ## set item appearances ...[0 item(s)] done [0.00s].
-## set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].
+## set transactions ...[169 item(s), 9835 transaction(s)] done [0.01s].
 ## sorting and recoding items ... [120 item(s)] done [0.00s].
-## creating transaction tree ... done [0.00s].
+## creating transaction tree ... done [0.01s].
 ## checking subsets of size 1 2 3 4 done [0.00s].
 ## writing ... [120 rule(s)] done [0.00s].
 ## creating S4 object  ... done [0.00s].</code></pre>
@@ -1049,7 +1066,7 @@ grocery&lt;- as(groceries, &quot;transactions&quot;)</code></pre>
 ## Absolute minimum support count: 98 
 ## 
 ## set item appearances ...[0 item(s)] done [0.00s].
-## set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].
+## set transactions ...[169 item(s), 9835 transaction(s)] done [0.01s].
 ## sorting and recoding items ... [88 item(s)] done [0.00s].
 ## creating transaction tree ... done [0.00s].
 ## checking subsets of size 1 2 3 4 done [0.00s].
