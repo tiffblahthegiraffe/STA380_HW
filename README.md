@@ -4,5 +4,9 @@ It includes 2 collaborative assingments.<br>
 <br>
 
 **Homework 1**<br>
+<br>
+For homework 1, the instruction is in exercise1.md
+<br>
 **Homework 2**<br>
-**Predictive Modeling Final Project**<br>
+<br>
+For homework 2, the instruction is in exercise1.md
