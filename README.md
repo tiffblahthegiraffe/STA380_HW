@@ -1,6 +1,6 @@
 # STA380_HW
-This is the repo of MSBA summer 2018 Predictive Modeling / Statistics Course.<br>
-It includes one group project and 2 collaborative assingment.<br>
+This is the repo of MSBA summer 2018 Statistics Course.<br>
+It includes 2 collaborative assingments.<br>
 <br>
 
 **Homework 1**<br>
